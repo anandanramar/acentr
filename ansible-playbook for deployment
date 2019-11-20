@@ -1,0 +1,56 @@
+tasks:
+  - name: Install MySQL repo
+    yum: name=http://dev.mysql.com/get/mysql57-community-release-el7-8.noarch.rpm state=present
+
+  - name: Install MySQL
+    yum: pkg={{ item }}
+    with_items:
+    - mysql-community-server
+    - mysql-community-client
+    - MySQL-python
+
+  - name: Start the MySQL service
+    service: name=mysqld state=started enabled=true
+
+  - name: create db
+    mysql_db: name:hotel state:present
+	
+  - name: create demo user
+    mysql_user: name=hiduser password=password priv=hotel.*:ALL host'%' state=present
+
+  - name: restart mysql
+    service: name=mysql state=restarted 
+
+  - name: install java 1.8
+    yum:
+	  name: java1.8*
+	  state: present
+
+  - name: install mavan 3.6.1
+    shell: |
+		wget http://mirrors.ibiblio.org/apache/maven/maven-3/3.6.0/binaries/apache-maven-3.6.0-bin.tar.gz –P /tmp  
+		tar xf /tmp/apache-maven-2.6.0-bin.tar.gz –C /opt
+		ln –s /opt/apache-maven-3.6.0 /opt/maven
+		touch /etc/profile.d/maven.shell
+		echo 'export JAVA_HOME=/usr/lib/jvm/jre-openjdk' >> /etc/profile.d/maven.shell
+		echo 'export M2_HOME=/opt/maven' >> /etc/profile.d/maven.shell
+		echo 'export MAVEN_HOME=/opt/maven' >> /etc/profile.d/maven.shell
+		echo 'export PATH=${M2_HOME}/bin:${PATH}' >> /etc/profile.d/maven.shell
+		
+  - name: checkout hive from git
+    shell: git clone https://github.com/smuthusa/hive.git
+    args: /project
+  
+  - name: update application config
+    shell: cat >> application.yaml << EOF
+           	spring.datasource:
+              platform: mysql
+              driverClassName: org.mysql.Driver
+              url: jdbc:mysql://127.0.0.1:3036/hotels
+              username: hiduser
+              password: password
+    args:/project/hive/src/main/resources
+
+  - name: start application in daemon mode ("mvn clean install sprint-boot:run" stepup made under /etc/systemd/system)
+    shell: systemctl start mvn.sh
+    args: /project 	 
